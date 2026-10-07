@@ -12,10 +12,10 @@ html,body{margin:0;background:var(--ink);color:var(--text);font-family:system-ui
 body{min-height:100dvh;padding:calc(10px + var(--safe-t)) 14px calc(16px + var(--safe-b));max-width:760px;margin:0 auto}
 h1{font-size:19px;margin:4px 0 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 h1 small{font-size:12px;font-weight:600;color:var(--mute)}
-.stage{position:relative;background:#000;border-radius:14px;overflow:hidden;border:3px solid var(--line);aspect-ratio:16/10;display:grid;place-items:center}
+.stage{position:relative;background:#000;border-radius:14px;overflow:hidden;border:3px solid var(--line);height:calc(100dvh - 380px);min-height:340px;display:grid;place-items:center}
 .stage.prep{border-color:var(--amber)}.stage.rec{border-color:var(--hong)}.stage.play{border-color:var(--chung)}
 .stage:fullscreen{border-radius:0;aspect-ratio:auto;width:100vw;height:100dvh}
-#live,#disp{width:100%;height:100%;object-fit:contain;display:block}
+#live,#disp{width:100%;height:100%;object-fit:cover;display:block}
 .mir #live,.mir #disp{transform:scaleX(-1)}
 .stage.grid::after{content:'';position:absolute;inset:0;pointer-events:none;background-size:25% 25%;background-image:linear-gradient(to right,rgba(255,255,255,.3) 1px,transparent 1px),linear-gradient(to bottom,rgba(255,255,255,.3) 1px,transparent 1px)}
 .badge{position:absolute;left:8px;top:8px;background:rgba(0,0,0,.7);border:1px solid var(--line);padding:6px 12px;border-radius:999px;font-size:14px;font-weight:800;font-variant-numeric:tabular-nums}
@@ -28,7 +28,7 @@ h1 small{font-size:12px;font-weight:600;color:var(--mute)}
 .bar{position:absolute;left:0;right:0;bottom:0;height:8px;background:rgba(255,255,255,.15)}.bar i{display:block;height:100%;width:0;background:var(--hong)}
 button,select{font:inherit;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-height:46px;cursor:pointer}
 button:active{transform:translateY(1px)}
-button.main{background:var(--hong);border-color:var(--hong);color:#190606;font-weight:800;font-size:17px;padding:14px 22px;flex:2 1 60%}
+button.main{background:var(--hong);border-color:var(--hong);color:#190606;font-weight:800;font-size:17px;padding:14px 22px;flex:1 1 100%}
 button.on{border-color:var(--chung);color:var(--chung)}
 button:disabled{opacity:.45}
 .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.row>button{flex:1 1 auto}
@@ -43,7 +43,7 @@ button:disabled{opacity:.45}
 #info{font-weight:800;text-align:center;font-variant-numeric:tabular-nums;margin-top:6px}
 .err{background:#2a1316;border:1px solid var(--hong);color:#ffd0d0;border-radius:12px;padding:10px 12px;margin-top:10px;font-size:13.5px;line-height:1.5}
 .note{font-size:12.5px;color:var(--mute);line-height:1.55;margin:10px 2px 0}
-@media (min-width:700px){.stage{aspect-ratio:16/9}}
+
 </style>
 </head>
 <body>
@@ -61,7 +61,6 @@ button:disabled{opacity:.45}
 
 <div class="row">
   <button class="main" id="start">📷 카메라 시작</button>
-  <button id="flip">🔄 앞/뒤</button>
 </div>
 
 <div class="panel">
@@ -102,7 +101,7 @@ const $=id=>document.getElementById(id);
 const live=$('live'),disp=$('disp'),dctx=disp.getContext('2d'),stage=$('stage'),tl=$('tl');
 const cap=document.createElement('canvas'),cctx=cap.getContext('2d');
 const FPS=24;
-let stream=null,facing='user',mode='idle',prepSec=5,recSec=5,frames=[],dur=0,A=0,B=0,ph=0,playing=true,speed=1,dragging=false;
+let stream=null,mode='idle',prepSec=5,recSec=5,frames=[],dur=0,A=0,B=0,ph=0,playing=true,speed=1,dragging=false;
 let prepEnd=0,recStart=0,timer=null,pending=0,lastDrawn=null,decoding=false,lastTick=performance.now(),lastNum=null,wake=null,sound=true,ac=null;
 
 function showErr(m){const e=$('err');e.textContent=m;e.hidden=!m;}
@@ -120,7 +119,7 @@ function setMode(m){
 async function startCam(){
   showErr(''); stopCam();
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ showErr(location.protocol==='content:'?'지금 content:// 주소로 열려 있어서 카메라가 막혀요. https 링크로 열어 주세요.':'이 주소에서는 카메라를 쓸 수 없어요. https 주소에서 열어 주세요.'); return; }
-  try{ stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:facing},width:{ideal:1280},height:{ideal:720}},audio:false}); }
+  try{ stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:720}},audio:false}); }
   catch(e){ stream=null; showErr(e&&e.name==='NotAllowedError'?'카메라 권한이 막혀 있어요. 주소창 옆 자물쇠 → 카메라 허용으로 바꿔 주세요.':'카메라를 열지 못했어요: '+(e&&e.message||e)); return; }
   live.srcObject=stream; try{ await live.play(); }catch(e){}
   try{ if('wakeLock' in navigator) wake=await navigator.wakeLock.request('screen'); }catch(e){}
@@ -196,7 +195,6 @@ $('stB').onclick=()=>step(-1); $('stF').onclick=()=>step(1);
 $('spd').onchange=e=>{ speed=+e.target.value; };
 
 $('start').onclick=()=>{ if(mode==='prep'||mode==='rec') cancel(); else begin(); };
-$('flip').onclick=async()=>{ cancel(); facing=facing==='user'?'environment':'user'; $('mirror').classList.toggle('on',facing==='user'); stage.classList.toggle('mir',facing==='user'); await startCam(); setMode('idle'); };
 $('mirror').onclick=()=>{ stage.classList.toggle('mir',$('mirror').classList.toggle('on')); };
 $('grid').onclick=()=>{ stage.classList.toggle('grid',$('grid').classList.toggle('on')); };
 $('snd').onclick=()=>{ sound=$('snd').classList.toggle('on'); };
