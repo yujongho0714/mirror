@@ -1,5 +1,5 @@
-const CACHE='coaching2-v3';   /* 앱 파일 */
-const LIB='coaching2-lib';    /* 해골 모델 등 외부 파일 (버전이 바뀌어도 지우지 않음) */
+const CACHE='coaching2-v4';   /* 앱 파일 */
+const LIB='coaching2-lib';    /* 외부 파일 (버전이 바뀌어도 지우지 않음) */
 const FILES=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',e=>{ e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES.map(u=>new Request(u,{cache:'reload'})))).then(()=>self.skipWaiting())); });
 self.addEventListener('activate',e=>{ e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(n=>n.startsWith('coaching2-v')&&n!==CACHE).map(n=>caches.delete(n)))).then(()=>self.clients.claim())); });
