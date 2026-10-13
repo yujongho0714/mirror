@@ -207,7 +207,7 @@ async function begin(){
 function cancel(){ clearInterval(timer); try{ if(mr&&mr.state!=='inactive') mr.stop(); }catch(e){} setMode('idle'); }
 /* ===== 날짜·시간 (영상에 박혀요) ===== */
 let recDate=Date.now(),clkT='',shrCache=null;
-function fmtStamp(ms){ const d=new Date(ms),p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'년 '+p(d.getMonth()+1)+'월 '+p(d.getDate())+'일 '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds()); }
+function fmtStamp(ms){ const d=new Date(ms),p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'년 '+p(d.getMonth()+1)+'월 '+p(d.getDate())+'일('+'일월화수목금토'[d.getDay()]+') '+p(d.getHours())+':'+p(d.getMinutes()); }
 function drawStamp(c,x,y,ms,fs){ c.save(); c.font='bold '+fs+'px sans-serif'; c.textAlign='left'; c.textBaseline='top'; c.lineJoin='round'; c.lineWidth=Math.max(3,fs/5); c.strokeStyle='rgba(0,0,0,.85)'; const t=fmtStamp(ms); c.strokeText(t,x,y); c.fillStyle='#fff'; c.fillText(t,x,y); c.restore(); }
 /* 카톡·갤러리가 열 수 있는 mp4를 먼저 쓰고, 폰이 mp4 녹화를 못 하면 webm으로 */
 function pickMime(){ if(!window.MediaRecorder) return null;
@@ -270,9 +270,9 @@ const MX={
   }
 };
 const mp4Cache=new WeakMap();
-async function toMp4(blob){
-  if(/mp4/.test(blob.type||'')) return blob;
-  if(mp4Cache.has(blob)) return mp4Cache.get(blob);
+async function toMp4(blob,opt){
+  if(!opt&&/mp4/.test(blob.type||'')) return blob;
+  if(!opt&&mp4Cache.has(blob)) return mp4Cache.get(blob);
   if(!window.VideoEncoder||!window.VideoFrame) return null;
   const U=URL.createObjectURL(blob),v=document.createElement('video');
   v.muted=true; v.defaultMuted=true; v.playsInline=true; v.preload='auto'; v.style.cssText='position:fixed;left:-9999px;width:2px;height:2px';
@@ -302,7 +302,8 @@ async function toMp4(blob){
         const t=md&&md.mediaTime!=null?md.mediaTime:v.currentTime;
         if(t>last&&v.readyState>=2){
           last=t; if(t0===null) t0=t;
-          cx.drawImage(v,0,0,w,h);
+          if(opt&&opt.mir){ cx.save(); cx.translate(w,0); cx.scale(-1,1); cx.drawImage(v,0,0,w,h); cx.restore(); } else cx.drawImage(v,0,0,w,h);
+          if(opt&&opt.startAt) drawStamp(cx,12,12,opt.startAt+t*1000,Math.max(18,Math.round(w/22)));
           const f=new VideoFrame(cv,{timestamp:Math.round((t-t0)*1e6)});
           try{ enc.encode(f,{keyFrame:n%60===0}); }catch(e){ f.close(); clearTimeout(lim); no(e); return; }
           f.close(); n++;
@@ -318,7 +319,7 @@ async function toMp4(blob){
     await enc.flush(); try{ enc.close(); }catch(e){}
     if(err||!desc||samples.length<2) throw new Error('empty');
     const out=MX.mux(w,h,desc,samples);
-    mp4Cache.set(blob,out); return out;
+    if(!opt) mp4Cache.set(blob,out); return out;
   }catch(e){ try{ if(enc&&enc.state!=='closed') enc.close(); }catch(_){} return null; }
   finally{ v.pause(); v.remove(); URL.revokeObjectURL(U); }
 }
@@ -491,6 +492,7 @@ async function renderCmp(job){
 }
 /* ---- 영상 한 개에 날짜·시간을 박아서 새 영상으로 만들어요 ---- */
 async function renderStamp(clip,mir){
+  if(clip.startAt){ try{ const m=await toMp4(clip.blob,{startAt:clip.startAt,mir}); if(m) return {blob:m,ext:'mp4'}; }catch(e){} }
   const mt=pickMime(); if(!mt||!clip.startAt||!HTMLCanvasElement.prototype.captureStream) return null;
   const host=$('rv'),v=document.createElement('video'); v.muted=true; v.defaultMuted=true; v.playsInline=true; v.preload='auto'; v._u=URL.createObjectURL(clip.blob); v.src=v._u; host.appendChild(v);
   let rec=null,iv=null;
