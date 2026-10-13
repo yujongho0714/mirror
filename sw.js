@@ -1,4 +1,4 @@
-const CACHE='coaching2-v6';   /* 앱 파일 */
+const CACHE='coaching2-v7';   /* 앱 파일 */
 const LIB='coaching2-lib';    /* 외부 파일 (버전이 바뀌어도 지우지 않음) */
 const FILES=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',e=>{ e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES.map(u=>new Request(u,{cache:'reload'})))).then(()=>self.skipWaiting())); });

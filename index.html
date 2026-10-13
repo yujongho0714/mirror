@@ -146,6 +146,7 @@ button.pickB{background:var(--hong);border-color:var(--hong);color:#190606}
     <button id="stF">1프레임 ▶</button>
     <select id="spd" hidden aria-label="재생 속도"><option value="0.25">0.25배</option><option value="0.5">0.5배</option><option value="1" selected>1배</option></select>
   </div>
+  <div class="row"><button id="shr1">📤 이 영상 카톡·갤러리로 보내기</button></div>
   <div class="row"><button id="del" class="danger">🗑 이 영상 삭제 (맘에 안 들어요)</button></div>
 </div>
 
@@ -202,9 +203,20 @@ async function begin(){
   prepEnd=performance.now()+prepSec*1000; setMode('prep'); $('badge').textContent='🏃 이동 시간'; $('badge').className='badge';
 }
 function cancel(){ clearInterval(timer); try{ if(mr&&mr.state!=='inactive') mr.stop(); }catch(e){} setMode('idle'); }
+/* 카톡·갤러리가 열 수 있는 mp4를 먼저 쓰고, 폰이 mp4 녹화를 못 하면 webm으로 */
+function pickMime(){ if(!window.MediaRecorder) return null;
+  return ['video/mp4;codecs=avc1.42E01E','video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp8','video/webm'].find(t=>{ try{ return MediaRecorder.isTypeSupported(t); }catch(e){ return false; } })||null; }
+/* 공유창(카톡 등)으로 보내기. 안 되는 기기면 일반 다운로드로 */
+async function shareFiles(list){
+  const fs=list.map(f=>new File([f.blob],f.name,{type:(f.blob.type||'video/mp4').split(';')[0]}));
+  try{
+    if(navigator.canShare&&navigator.canShare({files:fs})){ await navigator.share({files:fs,title:'코칭2 영상'}); return 'shared'; }
+  }catch(e){ if(e&&e.name==='AbortError') return 'cancel'; }
+  list.forEach((f,i)=>setTimeout(()=>dl(f.blob,f.name),i*900)); return 'dl';
+}
 function startRec(){ frames=[]; recStart=performance.now(); setMode('rec'); beep(1100,.6); timer=setInterval(grab,1000/FPS);
   clipBlob=null; chunks=[]; mr=null;
-  try{ const mt=['video/webm;codecs=vp8','video/webm','video/mp4'].find(t=>window.MediaRecorder&&MediaRecorder.isTypeSupported(t));
+  try{ const mt=pickMime();
     if(mt){ mr=new MediaRecorder(stream,{mimeType:mt,videoBitsPerSecond:4e6}); mr._t=mt; mr.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); }; mr.start(); } }catch(e){ mr=null; }
 }
 function grab(){
@@ -358,6 +370,14 @@ async function keepPend(){
 function closeOv(){ const ov=$('ov'); ov.querySelectorAll('video').forEach(v=>{ try{ v.pause(); }catch(e){} v.removeAttribute('src'); }); ov.hidden=true; ov.innerHTML=''; }
 function toIdle(){ TR.rk++; clipBlob=null; frames=[]; lastDrawn=null; playing=true; $('pp').textContent='⏸ 정지'; closeOv(); setMode('idle'); updTour(); }
 
+$('shr1').onclick=async()=>{
+  try{ await clipP; }catch(e){}
+  if(!clipBlob){ msg('영상이 아직 준비 중이에요. 잠시 뒤 다시 눌러 주세요.',3000); return; }
+  const ext=(clipBlob.type||'').includes('mp4')?'mp4':'webm';
+  const r=await shareFiles([{blob:clipBlob,name:'코칭2_동작'+TR.move+'_'+(TR.pend?TR.pend.id:TR.seq)+'.'+ext}]);
+  if(r==='dl') msg('이 기기는 공유창을 지원 안 해서 다운로드로 저장했어요.',4000);
+  else if(ext==='webm') msg('⚠️ 이 폰은 webm으로만 녹화돼요. 카톡에서 재생이 안 될 수 있어요.',5000);
+};
 /* 삭제: 맘에 안 드는 영상은 월드컵에 못 들어가요 */
 $('del').onclick=()=>{ TR.rk++; if(TR.pend&&TR.pend.id===TR.seq) TR.seq--; TR.pend=null; toIdle(); showErr(''); msg('🗑 삭제했어요. 다시 촬영해 주세요.',3500); };
 
@@ -407,7 +427,7 @@ function askBest(A,B,info){
 /* ---- 경기마다 "왼쪽 잘한 영상 | 오른쪽 못한 영상" 좌우 분할 영상을 만들어요 (고르는 동안 뒤에서 차례로) ---- */
 async function renderCmp(job){
   if(!window.MediaRecorder||!HTMLCanvasElement.prototype.captureStream) return null;
-  const mt=['video/webm;codecs=vp8','video/webm','video/mp4'].find(t=>MediaRecorder.isTypeSupported(t)); if(!mt) return null;
+  const mt=pickMime(); if(!mt) return null;
   const host=$('rv'),W=job.win,L=job.lose;
   const mk=b=>{ const v=document.createElement('video'); v.muted=true; v.defaultMuted=true; v.playsInline=true; v.preload='auto'; v._u=URL.createObjectURL(b); v.src=v._u; host.appendChild(v); return v; };
   const va=mk(W.blob),vb=mk(L.blob);
@@ -477,6 +497,7 @@ function showChamp(champ,jobs){
       '<div class="cmp one"><div><video id="cvC" muted playsinline loop'+mir+'></video></div></div>'+
       '<div id="cSt" style="font-weight:800;text-align:center;font-size:14px;color:var(--amber)"></div>'+
       '<div class="row"><button class="pick pickA" id="cSave" style="font-size:18px;padding:18px 10px">💾 월드컵 결과 한 번에 저장</button></div>'+
+      '<div class="row"><button class="pick" id="cShare" style="font-size:17px;padding:16px 10px">📤 카톡·다른 앱으로 보내기</button></div>'+
       '<div class="row" id="cAfter" hidden><button class="pick pickB" id="cAgain">🎥 영상 다시 촬영하기<br><small>(가장 잘한 동작과 비교 시작)</small></button><button class="pick" id="cNew">🆕 다른 동작 촬영하기<br><small>(기록 초기화)</small></button></div>'+
       '<p class="note">저장해야 다음으로 넘어갈 수 있어요. 파일이 여러 개 내려받아져요 (“여러 파일 다운로드” 허용 창이 뜨면 허용).</p>';
     ov.hidden=false;
@@ -485,6 +506,21 @@ function showChamp(champ,jobs){
     const st=$('cSt'); let saved=false;
     const tick=setInterval(()=>{ const d=jobs.filter(j=>j.done).length; st.textContent=jobs.length?(d<jobs.length?'🎞 좌우 비교 영상 만드는 중 '+d+'/'+jobs.length:'✅ 좌우 비교 영상 '+jobs.length+'개 준비 완료'):''; },300);
     const fin=r=>{ clearInterval(tick); try{ vc.pause(); }catch(e){} URL.revokeObjectURL(uc); res(r); };
+    const mkFiles=()=>{
+      const no=saved?TR.cup:TR.cup+1,pre='동작'+TR.move+'_월드컵'+no+'_',files=[],got=new Set();
+      jobs.forEach(j=>{
+        if(j.out) files.push({blob:j.out.blob,name:pre+j.round+'라운드_'+j.k+'경기_잘한'+j.win.id+'번_못한'+j.lose.id+'번.'+j.out.ext});
+        else [j.win,j.lose].forEach(x=>{ if(!got.has(x.id)){ got.add(x.id); files.push({blob:x.blob,name:pre+'원본_'+x.id+'번.'+x.ext}); } });
+      });
+      files.push({blob:champ.blob,name:pre+'최고영상_'+champ.id+'번.'+champ.ext});
+      return files;
+    };
+    $('cShare').onclick=async()=>{
+      if(jobs.some(j=>!j.done)){ st.textContent='⏳ 비교 영상 만드는 중이에요. 끝나면 다시 눌러 주세요'; return; }
+      const files=mkFiles(),r=await shareFiles(files);
+      if(r!=='cancel'){ saved=true; $('cAfter').hidden=false; }
+      st.textContent=r==='shared'?'✅ 공유창으로 보냈어요':r==='dl'?'⚠️ 이 기기는 공유창을 지원 안 해서 다운로드로 저장했어요':'공유를 취소했어요';
+    };
     $('cSave').onclick=async()=>{
       const b=$('cSave'); sparkleEl(b,18); b.disabled=true; b.textContent='⏳ 저장 준비 중…';
       await Promise.all(jobs.map(j=>j.p));
