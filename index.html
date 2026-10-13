@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>코칭2 · 촬영 후 구간 반복</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0d1117">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
 :root{--ink:#0d1117;--panel:#161c26;--line:#273244;--text:#e8edf3;--mute:#8a97aa;--hong:#ff5d5d;--chung:#4aa8ff;--amber:#ffc93c;--ok:#5fe0a0;--safe-b:env(safe-area-inset-bottom,0px);--safe-t:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -261,6 +265,7 @@ function setT(){ prepSec=+$('prepS').value; recSec=+$('recS').value; $('prepO').
 $('prepS').oninput=setT; $('recS').oninput=setT;
 try{ const v=JSON.parse(localStorage.getItem('c2t')||'null'); if(v){ $('prepS').value=v[0]; $('recS').value=v[1]; } }catch(e){}
 setT(); setMode('idle');
+if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol)){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
 document.addEventListener('keydown',e=>{ if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT') return; if(e.key===' '&&mode==='play'){ e.preventDefault(); $('pp').click(); } });
 </script>
 </body>
