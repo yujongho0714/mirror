@@ -78,7 +78,9 @@ button.cupBig{font-size:22px;padding:28px 14px;border-radius:18px;background:#ff
 #startRow.pl button{flex:1 1 0;font-size:15px;padding:14px 6px}
 #chkTop{position:fixed;left:0;right:0;top:0;z-index:60;background:#161c26;border-bottom:1px solid var(--line);padding:calc(8px + var(--safe-t)) 12px 8px;display:flex;align-items:center;gap:10px}
 #chkTop button{min-height:42px;padding:8px 18px;font-weight:800;background:var(--chung);border-color:var(--chung);color:#05121f}
-body.chk{padding-top:calc(66px + var(--safe-t))}
+body.chk{padding-top:calc(66px + var(--safe-t));padding-bottom:calc(92px + var(--safe-b))}
+#nextBar{position:fixed;left:0;right:0;bottom:0;z-index:60;background:#161c26;border-top:1px solid var(--line);padding:10px 12px calc(10px + var(--safe-b))}
+#nextBar button{width:100%;min-height:56px;font-size:18px;font-weight:900;background:var(--ok);border-color:var(--ok);color:#06210f}
 body.chk .hideChk{display:none!important}
 button.ana{width:100%;margin:0;background:#ffd23f;border-color:#ffd23f;color:#2a1300;font-weight:800;font-size:16px}
 #ov{position:fixed;inset:0;z-index:200;background:#0b0f16;display:flex;flex-direction:column;gap:8px;padding:calc(10px + var(--safe-t)) 12px calc(12px + var(--safe-b));overflow:auto}
@@ -95,6 +97,7 @@ button.pickB{background:var(--hong);border-color:var(--hong);color:#190606}
 <body>
 <h1 class="hideChk">🥋 코칭2 <small>이동 시간 → 촬영 → 원하는 구간만 반복</small></h1>
 
+<div id="nextBar" hidden><button id="nextB">✅ 보관하고 다음 촬영</button></div>
 <div id="chkTop" hidden><button id="chkBack">← 뒤로</button><b>🔍 동작체크</b></div>
 
 <div class="stage mir" id="stage">
@@ -252,6 +255,7 @@ function endRec(){
     }else res();
   });
   setMode('play'); $('badge').className='badge play'; $('badge').textContent='▶ 재생';
+  openChk();  /* 촬영이 끝나면 바로 동작체크 화면으로 */
   clipP.then(loadClip);
 }
 async function loadClip(){
@@ -725,7 +729,7 @@ const _setMode=setMode;
 let chk=false;
 function view(){
   const p=(mode==='play');
-  $('chkPanel').hidden=!(p&&!chk); $('playBox').hidden=!(p&&chk); $('chkTop').hidden=!(p&&chk);
+  $('chkPanel').hidden=!(p&&!chk); $('playBox').hidden=!(p&&chk); $('chkTop').hidden=!(p&&chk); $('nextBar').hidden=!(p&&chk);
   $('delMain').hidden=!(p&&!chk); $('startRow').classList.toggle('pl',p&&!chk);
   document.body.classList.toggle('chk',p&&chk);
 }
@@ -733,6 +737,7 @@ function openChk(){ if(chk||mode!=='play') return; chk=true; history.pushState({
 function closeChk(){ if(!chk) return; chk=false; view(); window.scrollTo(0,0); }
 $('chk').onclick=openChk;
 $('delMain').onclick=()=>$('del').click();
+$('nextB').onclick=()=>$('start').click();
 $('chkBack').onclick=()=>{ if(history.state&&history.state.chk) history.back(); else closeChk(); };
 window.addEventListener('popstate',()=>{ if(!(history.state&&history.state.chk)) closeChk(); });
 setMode=function(m){
