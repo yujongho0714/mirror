@@ -202,9 +202,93 @@ async function begin(){
   if(!stream){ await startCam(); setMode('idle'); return; }  /* 카메라만 켜요. 자리를 잡고 '촬영 시작'을 눌러야 이동 시간이 시작돼요 */
   clearInterval(timer); frames=[]; lastDrawn=null; lastNum=null;
   if(prepSec<=0){ startRec(); return; }
-  prepEnd=performance.now()+prepSec*1000; setMode('prep'); $('badge').textContent='🏃 이동 시간'; $('badge').className='badge';
+  prepEnd=performance.now()+prepSec*1000; setMode('prep'); $('badge').textContent='🏃 이동 시간'; $('badge').className='badge'; timer=setInterval(tick,100);
 }
 function cancel(){ clearInterval(timer); try{ if(mr&&mr.state!=='inactive') mr.stop(); }catch(e){} setMode('idle'); }
+/* ===== 도우미 ===== */
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let msgT=null;
+function msg(t,ms){ const m=$('msg'); m.textContent=t; clearTimeout(msgT); if(ms) msgT=setTimeout(()=>{ m.textContent=''; },ms); }
+function sparkle(x,y,n){ const em=['✨','⭐','🎉','🏆','💫']; for(let i=0;i<n;i++){ const s=document.createElement('span'); s.className='sp'; s.textContent=em[i%em.length]; s.style.left=x+'px'; s.style.top=y+'px'; const a=Math.random()*6.283,d=60+Math.random()*140; s.style.setProperty('--dx',Math.cos(a)*d+'px'); s.style.setProperty('--dy',Math.sin(a)*d+'px'); document.body.appendChild(s); setTimeout(()=>s.remove(),1000); } }
+async function fixWebm(b){ return b; }
+const pv=document.createElement('video'); pv.muted=true; pv.defaultMuted=true; pv.playsInline=true; pv.preload='auto'; $('rv').appendChild(pv);
+let pvReady=false,pvUrl=null,recLen=0;
+function setSpeed(s){ speed=+s; pv.playbackRate=speed; $('spdRow').querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.s===speed)); try{ $('spd').value=String(speed); }catch(e){} }
+
+/* ===== 촬영 · 재생 ===== */
+function tick(){
+  const now=performance.now();
+  if(mode==='prep'){
+    const left=Math.ceil((prepEnd-now)/1000);
+    if(left<=0){ clearInterval(timer); startRec(); return; }
+    $('cdNum').textContent=left;
+    if(left!==lastNum){ lastNum=left; beep(left<=3?880:660,.12); }
+  }else if(mode==='rec'){
+    const el=(now-recStart)/1000;
+    $('barFill').style.width=Math.min(100,el/recSec*100)+'%';
+    $('badge').textContent='● 촬영 '+Math.max(0,Math.ceil(recSec-el))+'초';
+    if(el>=recSec){ clearInterval(timer); endRec(); }
+  }
+}
+function startRec(){
+  clearInterval(timer);
+  if(!stream||!window.MediaRecorder){ showErr('이 브라우저는 녹화를 지원하지 않아요. 최신 크롬·사파리에서 열어 주세요.'); setMode('idle'); return; }
+  chunks=[]; clipBlob=null; recDate=Date.now();
+  try{ const mt=pickMime(); mr=mt?new MediaRecorder(stream,{mimeType:mt}):new MediaRecorder(stream); }
+  catch(e){ showErr('녹화를 시작하지 못했어요: '+(e&&e.message||e)); setMode('idle'); return; }
+  mr.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
+  mr.start(500);
+  recStart=performance.now(); $('barFill').style.width='0%';
+  setMode('rec'); $('badge').className='badge rec'; $('badge').textContent='● 촬영 중'; beep(1200,.35);
+  timer=setInterval(tick,100);
+}
+function endRec(){
+  clearInterval(timer); recLen=(performance.now()-recStart)/1000;
+  const m=mr;
+  clipP=new Promise(res=>{
+    if(m&&m.state!=='inactive'){
+      m.onstop=()=>{ clipBlob=chunks.length?new Blob(chunks,{type:(m.mimeType||'video/webm')}):null; res(); };
+      try{ m.stop(); }catch(e){ res(); }
+    }else res();
+  });
+  setMode('play'); $('badge').className='badge play'; $('badge').textContent='▶ 재생';
+  clipP.then(loadClip);
+}
+async function loadClip(){
+  if(!clipBlob){ showErr('영상 저장에 실패했어요. 다시 촬영해 주세요.'); return; }
+  pvReady=false; if(pvUrl) URL.revokeObjectURL(pvUrl);
+  pvUrl=URL.createObjectURL(clipBlob); pv.src=pvUrl;
+  await new Promise(r=>{ pv.onloadedmetadata=r; setTimeout(r,3000); });
+  if(!isFinite(pv.duration)){  /* MediaRecorder webm은 길이 정보가 없어서 한 번 끝까지 보내 계산시켜요 */
+    await new Promise(r=>{ pv.ontimeupdate=()=>{ pv.ontimeupdate=null; r(); }; try{ pv.currentTime=1e101; }catch(e){ r(); } setTimeout(r,2500); });
+    try{ pv.currentTime=0; }catch(e){}
+  }
+  dur=(isFinite(pv.duration)&&pv.duration>0)?pv.duration:Math.max(1,recLen);
+  A=0; B=dur; ph=0; tp=null; playing=true; $('pp').textContent='⏸ 정지'; $('endLbl').textContent=dur.toFixed(1)+'초';
+  pv.playbackRate=speed; try{ await pv.play(); }catch(e){}
+  pvReady=true;
+}
+function loop(){
+  requestAnimationFrame(loop);
+  if(mode!=='play'){
+    if(!pv.paused) pv.pause();
+    if(stream){ clk.hidden=false; clk.textContent=fmtStamp(Date.now()); } else clk.hidden=true;
+    return;
+  }
+  if(!pvReady||!dur) return;
+  if(pv.videoWidth&&(disp.width!==pv.videoWidth||disp.height!==pv.videoHeight)){ disp.width=pv.videoWidth; disp.height=pv.videoHeight; }
+  try{ dctx.drawImage(pv,0,0,disp.width,disp.height); }catch(e){}
+  ph=pv.currentTime;
+  if(playing&&(pv.ended||ph>=B-0.02||ph<A-0.1)){ pv.currentTime=A; ph=A; pv.play().catch(()=>{}); }
+  clk.hidden=false; clk.textContent=fmtStamp(recDate+ph*1000);
+  $('ph').style.left=(ph/dur*100)+'%';
+  $('sel').style.left=(A/dur*100)+'%'; $('sel').style.width=((B-A)/dur*100)+'%';
+  const T=$('tp'); T.hidden=(tp===null);
+  if(tp!==null){ const pc=tp/dur*100; T.style.left=pc+'%'; $('tpT').textContent=tp.toFixed(2)+'초'; $('tpT').style.transform=pc>70?'translateX(-100%)':'none'; }
+  $('info').textContent='🔁 반복 구간 '+A.toFixed(2)+'초 ~ '+B.toFixed(2)+'초 (길이 '+(B-A).toFixed(2)+'초)\n현재 '+ph.toFixed(2)+'초';
+}
+requestAnimationFrame(loop);
+
 /* ===== 날짜·시간 (영상에 박혀요) ===== */
 let recDate=Date.now(),clkT='',shrCache=null;
 function fmtStamp(ms){ const d=new Date(ms),p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'년 '+p(d.getMonth()+1)+'월 '+p(d.getDate())+'일('+'일월화수목금토'[d.getDay()]+') '+p(d.getHours())+':'+p(d.getMinutes()); }
@@ -656,6 +740,30 @@ setMode=function(m){
   _setMode(m); $('spdRow').hidden=(m!=='play'); view(); updTour();
 };
 setSpeed(1);
+
+
+/* ===== 버튼 연결 ===== */
+$('start').onclick=()=>{ if(mode==='prep'||mode==='rec') cancel(); else begin(); };
+$('spdRow').querySelectorAll('button').forEach(b=>{ b.onclick=()=>setSpeed(b.dataset.s); });
+$('spd').onchange=()=>setSpeed($('spd').value);
+$('mirror').onclick=()=>{ const on=stage.classList.toggle('mir'); $('mirror').classList.toggle('on',on); };
+$('grid').onclick=()=>{ const on=stage.classList.toggle('grid'); $('grid').classList.toggle('on',on); };
+$('snd').onclick=()=>{ sound=!sound; $('snd').classList.toggle('on',sound); };
+$('full').onclick=()=>{ const f=stage.requestFullscreen||stage.webkitRequestFullscreen; if(document.fullscreenElement) document.exitFullscreen(); else if(f) f.call(stage); else msg('이 기기는 전체화면을 지원하지 않아요',3000); };
+function curT(){ return tp!==null?tp:ph; }
+function ppText(){ $('pp').textContent=playing?'⏸ 정지':'▶ 재생'; }
+function seekTo(t){ t=Math.max(0,Math.min(dur,t)); tp=t; try{ pv.currentTime=t; }catch(e){} playing=false; pv.pause(); ppText(); }
+function tlTime(e){ const r=tl.getBoundingClientRect(); return Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))*dur; }
+tl.addEventListener('pointerdown',e=>{ if(!dur) return; dragging=true; try{ tl.setPointerCapture(e.pointerId); }catch(_){} seekTo(tlTime(e)); e.preventDefault(); });
+tl.addEventListener('pointermove',e=>{ if(dragging) seekTo(tlTime(e)); });
+['pointerup','pointercancel'].forEach(n=>tl.addEventListener(n,()=>{ dragging=false; }));
+function resumeLoop(){ pv.currentTime=A; playing=true; ppText(); pv.play().catch(()=>{}); }
+$('setA').onclick=()=>{ const t=curT(); A=Math.min(t,Math.max(0,dur-0.1)); if(B<=A+0.1) B=dur; tp=null; resumeLoop(); };
+$('setB').onclick=()=>{ const t=curT(); B=Math.max(t,0.1); if(A>=B-0.1) A=0; tp=null; resumeLoop(); };
+$('allR').onclick=()=>{ A=0; B=dur; tp=null; resumeLoop(); };
+$('pp').onclick=()=>{ playing=!playing; ppText(); if(playing){ tp=null; if(pv.currentTime>=B-0.03||pv.currentTime<A) pv.currentTime=A; pv.play().catch(()=>{}); } else pv.pause(); };
+function step(d){ playing=false; pv.pause(); ppText(); const t=Math.max(0,Math.min(dur,pv.currentTime+d/FPS)); pv.currentTime=t; tp=t; }
+$('stB').onclick=()=>step(-1); $('stF').onclick=()=>step(1);
 
 function setT(){ prepSec=+$('prepS').value; recSec=+$('recS').value; $('prepO').textContent=prepSec+'초'; $('recO').textContent=recSec+'초'; try{ localStorage.setItem('c2t',JSON.stringify([prepSec,recSec])); }catch(e){} }
 $('prepS').oninput=setT; $('recS').oninput=setT;
