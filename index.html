@@ -51,6 +51,20 @@ button:disabled{opacity:.45}
 #tp b{position:absolute;top:3px;left:0;background:var(--amber);color:#1b1200;font-size:13px;font-weight:900;padding:2px 8px;border-radius:999px;white-space:nowrap;font-variant-numeric:tabular-nums}
 #tp i{position:absolute;bottom:5px;left:-11px;width:22px;height:22px;border-radius:50%;background:var(--amber);border:3px solid #fff;box-shadow:0 0 0 2px #000}
 .cmp>div{position:relative}
+/* 영상 위 플레이어 컨트롤 (터치하면 보여요) */
+.stage.play{cursor:pointer}
+#pc{position:absolute;inset:0;z-index:4;opacity:0;transition:opacity .2s;pointer-events:none;background:linear-gradient(to top,rgba(0,0,0,.7),transparent 38%)}
+#pc.show{opacity:1}
+#pc.show .pcRow{pointer-events:auto}
+#pcBig{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:78px;height:78px;border-radius:50%;background:rgba(0,0,0,.55);border:2px solid rgba(255,255,255,.85);font-size:34px;display:grid;place-items:center;color:#fff;pointer-events:none}
+.pcRow{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:10px;padding:6px 12px 12px}
+#pcPP{min-height:46px;width:52px;padding:0;background:rgba(0,0,0,.55);border-color:rgba(255,255,255,.45);font-size:20px;flex:none}
+#pcT{font-size:13px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;white-space:nowrap;text-shadow:0 0 4px #000}
+#pcBar{flex:1;position:relative;height:44px;touch-action:none;cursor:pointer;user-select:none;-webkit-user-select:none}
+#pcBar .tr{position:absolute;left:0;right:0;top:50%;height:6px;margin-top:-3px;border-radius:3px;background:rgba(255,255,255,.3);overflow:hidden}
+#pcSel{position:absolute;top:0;bottom:0;background:rgba(74,168,255,.55)}
+#pcFill{position:absolute;left:0;top:0;bottom:0;background:var(--hong)}
+#pcKnob{position:absolute;top:50%;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;background:#fff;box-shadow:0 0 0 3px var(--hong)}
 @keyframes shine{0%{background-position:-200% 0}100%{background-position:200% 0}}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.035)}}
 @keyframes fly{0%{transform:translate(0,0) scale(.4) rotate(0);opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(1.4) rotate(260deg);opacity:0}}
@@ -119,6 +133,14 @@ a.go{color:var(--chung);text-decoration:underline;cursor:pointer;margin-left:6px
   <div class="cd" id="cd" hidden><small>🏃 자리로 이동하세요! 곧 촬영돼요</small><b id="cdNum">5</b></div>
   <div class="aprog" id="aprog" hidden><b id="aprogT">🔍 관절 분석 중</b><div class="ab"><i id="aprogB"></i></div></div>
   <div class="bar" id="bar" hidden><i id="barFill"></i></div>
+  <div id="pc" hidden>
+    <div id="pcBig">▶</div>
+    <div class="pcRow">
+      <button id="pcPP" aria-label="재생/정지">▶</button>
+      <div id="pcBar"><div class="tr"><div id="pcSel"></div><div id="pcFill"></div></div><div id="pcKnob"></div></div>
+      <span id="pcT">0.0 / 0.0초</span>
+    </div>
+  </div>
   <div class="wait" id="wait"><div><b>카메라를 켜세요</b><span>시작을 누르면 이동 시간 뒤 자동으로 촬영돼요</span></div></div>
 </div>
 <div class="row" id="spdRow" hidden><button data-s="0.25">0.25x</button><button data-s="0.5">0.5x</button><button data-s="0.75">0.75x</button><button data-s="1" class="on">1.0x</button></div>
@@ -174,7 +196,6 @@ a.go{color:var(--chung);text-decoration:underline;cursor:pointer;margin-left:6px
     <label class="hgt">키 <input type="number" id="anaH" min="80" max="210" value="140" inputmode="numeric"> cm</label>
   </div>
   <div class="row"><button class="ana" id="anaGo">⚡ 동작 정밀 분석</button></div>
-  <label class="note" style="display:flex;gap:8px;align-items:center;margin:8px 2px 0"><input type="checkbox" id="anaAuto" checked> 촬영하면 자동으로 정밀 분석 (처음 한 번은 AI 모델을 내려받아요)</label>
   <label class="note" style="display:flex;gap:8px;align-items:center;margin:6px 2px 0"><input type="checkbox" id="anaMulti"> 👥 여러 명이 같이 찍혀요 (켜면 분석이 2~3배 느려져요)</label>
   <div id="anaMsg" class="note" style="color:var(--amber)"></div>
   <div id="anaRes" hidden>
@@ -216,7 +237,7 @@ function setMode(m){
   stage.classList.remove('prep','rec','play'); if(m==='prep'||m==='rec'||m==='play') stage.classList.add(m);
   live.hidden=(m==='play'); disp.hidden=(m!=='play');
   $('wait').hidden=!!stream; $('cd').hidden=(m!=='prep'); $('bar').hidden=(m!=='rec');
-  $('playBox').hidden=(m!=='play'); $('badge').hidden=(m==='idle'||m==='proc');
+  $('playBox').hidden=(m!=='play'); $('badge').hidden=(m==='idle'||m==='proc'); $('pc').hidden=(m!=='play');
   $('start').textContent= m==='prep'||m==='rec' ? '■ 취소' : m==='play' ? '✅ 보관하고 다음 촬영' : '📷 '+(stream?'촬영 시작':'카메라 시작');
 }
 
@@ -227,7 +248,6 @@ async function startCam(){
   catch(e){ stream=null; showErr(e&&e.name==='NotAllowedError'?'카메라 권한이 막혀 있어요. 주소창 옆 자물쇠 → 카메라 허용으로 바꿔 주세요.':'카메라를 열지 못했어요: '+(e&&e.message||e)); return; }
   live.srcObject=stream; try{ await live.play(); }catch(e){}
   try{ if('wakeLock' in navigator) wake=await navigator.wakeLock.request('screen'); }catch(e){}
-  setTimeout(()=>{ if(typeof anaWarm==='function') anaWarm(); },600);
 }
 function stopCam(){ if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; } try{ wake&&wake.release(); }catch(e){} }
 
@@ -235,11 +255,11 @@ async function begin(){
   if(!ac){ try{ ac=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
   if(ac&&ac.state==='suspended') ac.resume();
   if(!stream){ await startCam(); setMode('idle'); return; }  /* 카메라만 켜요. 자리를 잡고 '촬영 시작'을 눌러야 이동 시간이 시작돼요 */
-  clearInterval(timer); frames=[]; lastDrawn=null; lastNum=null;
+  clearInterval(timer); freeFrames(); lastDrawn=null; lastNum=null;
   if(prepSec<=0){ startRec(); return; }
   prepEnd=performance.now()+prepSec*1000; setMode('prep'); $('badge').textContent='🏃 이동 시간'; $('badge').className='badge'; timer=setInterval(tick,100);
 }
-function cancel(){ clearInterval(timer); try{ if(mr&&mr.state!=='inactive') mr.stop(); }catch(e){} setMode('idle'); }
+function cancel(){ clearInterval(timer); capOn=false; freeFrames(); try{ if(mr&&mr.state!=='inactive') mr.stop(); }catch(e){} setMode('idle'); }
 /* ===== 도우미 ===== */
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 let msgT=null;
@@ -249,6 +269,39 @@ async function fixWebm(b){ return b; }
 const pv=document.createElement('video'); pv.muted=true; pv.defaultMuted=true; pv.playsInline=true; pv.preload='auto'; $('rv').appendChild(pv);
 let pvReady=false,pvUrl=null,recLen=0;
 function setSpeed(s){ speed=+s; pv.playbackRate=speed; $('spdRow').querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.s===speed)); try{ $('spd').value=String(speed); }catch(e){} }
+
+/* ===== 밀어서 보기용 장면 저장 =====
+   촬영하는 동안 화면을 작은 사진으로 계속 저장해 둬요.
+   막대를 밀 때는 영상을 매번 다시 찾지 않고 이 사진을 바로 보여줘서 슬로우모션처럼 끊김 없이 넘어가요. */
+let capOn=false,capGen=0,capGap=33,capLast=0,capDirty=false;
+const capCv=document.createElement('canvas'),capCx=capCv.getContext('2d');
+function freeFrames(){ capGen++; frames.forEach(f=>{ try{ f.b.close&&f.b.close(); }catch(e){} }); frames=[]; }
+function capStart(){
+  freeFrames(); capOn=false;
+  if(!window.createImageBitmap) return;
+  const vw=live.videoWidth||1280,vh=live.videoHeight||720,sc=Math.min(1,640/Math.max(vw,vh));
+  capCv.width=Math.round(vw*sc); capCv.height=Math.round(vh*sc);
+  const maxN=Math.max(60,Math.floor(220e6/(capCv.width*capCv.height*4)));  /* 메모리 약 220MB 안에서 */
+  capGap=Math.max(1000/30,recSec*1000/maxN)-3; capLast=-1e9; capOn=true; capNext(capGen);
+}
+function capNext(g){ if(!capOn||g!==capGen) return; if(live.requestVideoFrameCallback) live.requestVideoFrameCallback(()=>capFrame(g)); else requestAnimationFrame(()=>capFrame(g)); }
+function capFrame(g){
+  if(!capOn||g!==capGen) return;
+  const now=performance.now();
+  if(mode==='rec'&&now-capLast>=capGap&&live.readyState>=2){
+    capLast=now; const t=(now-recStart)/1000;
+    try{ capCx.drawImage(live,0,0,capCv.width,capCv.height);
+      createImageBitmap(capCv).then(b=>{ if(g!==capGen){ try{ b.close(); }catch(e){} return; } frames.push({t,b}); capDirty=true; }).catch(()=>{}); }catch(e){}
+  }
+  capNext(g);
+}
+function nearFrame(t){
+  const n=frames.length; if(!n) return null;
+  if(capDirty){ frames.sort((a,b)=>a.t-b.t); capDirty=false; }
+  let lo=0,hi=n-1; while(lo<hi){ const m=(lo+hi)>>1; if(frames[m].t<t) lo=m+1; else hi=m; }
+  if(lo>0&&Math.abs(frames[lo-1].t-t)<Math.abs(frames[lo].t-t)) lo--;
+  return frames[lo];
+}
 
 /* ===== 촬영 · 재생 ===== */
 function tick(){
@@ -275,10 +328,11 @@ function startRec(){
   mr.start(500);
   recStart=performance.now(); $('barFill').style.width='0%';
   setMode('rec'); $('badge').className='badge rec'; $('badge').textContent='● 촬영 중'; beep(1200,.35);
+  capStart();
   timer=setInterval(tick,100);
 }
 function endRec(){
-  clearInterval(timer); recLen=(performance.now()-recStart)/1000;
+  clearInterval(timer); recLen=(performance.now()-recStart)/1000; capOn=false;
   const m=mr;
   clipP=new Promise(res=>{
     if(m&&m.state!=='inactive'){
@@ -313,9 +367,11 @@ function loop(){
   }
   if(!pvReady||!dur) return;
   if(pv.videoWidth&&(disp.width!==pv.videoWidth||disp.height!==pv.videoHeight)){ disp.width=pv.videoWidth; disp.height=pv.videoHeight; }
-  try{ dctx.drawImage(pv,0,0,disp.width,disp.height); }catch(e){}
-  if(ANA.r){ try{ anaDraw(pv.currentTime); }catch(e){} }
-  ph=pv.currentTime;
+  /* 미는 중(또는 영상이 아직 그 위치를 못 찾았을 때)은 저장해 둔 장면을 바로 그려요 */
+  const f=(tp!==null&&frames.length&&(dragging||pv.seeking||Math.abs(pv.currentTime-tp)>0.06))?nearFrame(tp):null;
+  try{ dctx.drawImage(f?f.b:pv,0,0,disp.width,disp.height); }catch(e){}
+  if(ANA.r){ try{ anaDraw(f?tp:pv.currentTime); }catch(e){} }
+  ph=tp!==null?tp:pv.currentTime;
   if(ANA.r) anaUpdate(ph);
   if(playing&&!ANA.busy&&(pv.ended||ph>=B-0.02||ph<A-0.1)){ pv.currentTime=A; ph=A; pv.play().catch(()=>{}); }
   clk.hidden=false; clk.textContent=fmtStamp(recDate+ph*1000);
@@ -324,7 +380,20 @@ function loop(){
   const T=$('tp'); T.hidden=(tp===null);
   if(tp!==null){ const pc=tp/dur*100; T.style.left=pc+'%'; $('tpT').textContent=tp.toFixed(2)+'초'; $('tpT').style.transform=pc>70?'translateX(-100%)':'none'; }
   $('info').textContent='🔁 반복 구간 '+A.toFixed(2)+'초 ~ '+B.toFixed(2)+'초 (길이 '+(B-A).toFixed(2)+'초)\n현재 '+ph.toFixed(2)+'초';
+  /* 영상 위 플레이어 */
+  const pc=$('pc'),show=!playing||dragging||performance.now()<pcUntil;
+  pc.classList.toggle('show',show);
+  if(show){
+    const pp=ph/dur*100;
+    $('pcFill').style.width=pp+'%'; $('pcKnob').style.left=pp+'%';
+    $('pcSel').style.left=(A/dur*100)+'%'; $('pcSel').style.width=((B-A)/dur*100)+'%';
+    $('pcT').textContent=ph.toFixed(1)+' / '+dur.toFixed(1)+'초';
+    const ic=playing?'⏸':'▶'; if($('pcPP').textContent!==ic){ $('pcPP').textContent=ic; $('pcBig').textContent=playing?'⏸':'▶'; }
+    $('pcBig').hidden=dragging;
+  }
 }
+let pcUntil=0;
+function showPc(){ pcUntil=performance.now()+2500; }
 requestAnimationFrame(loop);
 
 /* ===== 날짜·시간 (영상에 박혀요) ===== */
@@ -486,7 +555,7 @@ async function keepPend(){
   updTour();
 }
 function closeOv(){ const ov=$('ov'); ov.querySelectorAll('video').forEach(v=>{ try{ v.pause(); }catch(e){} v.removeAttribute('src'); }); ov.hidden=true; ov.innerHTML=''; }
-function toIdle(){ TR.rk++; clipBlob=null; frames=[]; lastDrawn=null; playing=true; $('pp').textContent='⏸ 정지'; closeOv(); setMode('idle'); updTour(); }
+function toIdle(){ TR.rk++; clipBlob=null; capOn=false; freeFrames(); tp=null; lastDrawn=null; playing=true; $('pp').textContent='⏸ 정지'; closeOv(); setMode('idle'); updTour(); }
 
 $('shr1').onclick=async()=>{
   const bt=$('shr1');
@@ -792,16 +861,30 @@ $('snd').onclick=()=>{ sound=!sound; $('snd').classList.toggle('on',sound); };
 $('full').onclick=()=>{ const f=stage.requestFullscreen||stage.webkitRequestFullscreen; if(document.fullscreenElement) document.exitFullscreen(); else if(f) f.call(stage); else msg('이 기기는 전체화면을 지원하지 않아요',3000); };
 function curT(){ return tp!==null?tp:ph; }
 function ppText(){ $('pp').textContent=playing?'⏸ 정지':'▶ 재생'; }
-function seekTo(t){ t=Math.max(0,Math.min(dur,t)); tp=t; try{ pv.currentTime=t; }catch(e){} playing=false; pv.pause(); ppText(); }
-function tlTime(e){ const r=tl.getBoundingClientRect(); return Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))*dur; }
-tl.addEventListener('pointerdown',e=>{ if(!dur) return; dragging=true; try{ tl.setPointerCapture(e.pointerId); }catch(_){} seekTo(tlTime(e)); e.preventDefault(); });
-tl.addEventListener('pointermove',e=>{ if(dragging) seekTo(tlTime(e)); });
-['pointerup','pointercancel'].forEach(n=>tl.addEventListener(n,()=>{ dragging=false; }));
+/* 영상 위치 찾기: 앞의 찾기가 끝나야 다음 위치로 (한꺼번에 쌓여서 버벅이지 않게) */
+let seekWant=null;
+function reqSeek(t){ seekWant=t; if(!pv.seeking) doSeek(); }
+function doSeek(){ if(seekWant===null) return; const t=seekWant; seekWant=null; try{ pv.currentTime=t; }catch(e){} }
+pv.addEventListener('seeked',doSeek);
+function seekTo(t){ t=Math.max(0,Math.min(dur,t)); tp=t; playing=false; pv.pause(); ppText(); if(!(dragging&&frames.length)) reqSeek(t); }
+function tAt(el,e){ const r=el.getBoundingClientRect(); return Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))*dur; }
+/* 막대(아래 구간 막대 + 영상 위 막대) 밀기 */
+function bindScrub(el){
+  el.addEventListener('pointerdown',e=>{ if(!dur) return; e.stopPropagation(); dragging=true; try{ el.setPointerCapture(e.pointerId); }catch(_){} seekTo(tAt(el,e)); showPc(); e.preventDefault(); });
+  el.addEventListener('pointermove',e=>{ if(dragging){ seekTo(tAt(el,e)); showPc(); } });
+  ['pointerup','pointercancel'].forEach(n=>el.addEventListener(n,()=>{ if(!dragging) return; dragging=false; if(tp!==null) reqSeek(tp); showPc(); }));
+  el.addEventListener('click',e=>e.stopPropagation());
+}
+bindScrub(tl); bindScrub($('pcBar'));
+function togglePlay(){ playing=!playing; ppText(); if(playing){ tp=null; if(pv.currentTime>=B-0.03||pv.currentTime<A) pv.currentTime=A; pv.play().catch(()=>{}); } else { tp=pv.currentTime; pv.pause(); } showPc(); }
+/* 영상을 터치하면 재생 ↔ 정지, 플레이어 막대가 나타나요 */
+stage.addEventListener('click',e=>{ if(mode!=='play'||!pvReady) return; if(e.target.closest('.pcRow')) return; togglePlay(); });
+$('pcPP').onclick=e=>{ e.stopPropagation(); togglePlay(); };
 function resumeLoop(){ pv.currentTime=A; playing=true; ppText(); pv.play().catch(()=>{}); }
 $('setA').onclick=()=>{ const t=curT(); A=Math.min(t,Math.max(0,dur-0.1)); if(B<=A+0.1) B=dur; tp=null; resumeLoop(); };
 $('setB').onclick=()=>{ const t=curT(); B=Math.max(t,0.1); if(A>=B-0.1) A=0; tp=null; resumeLoop(); };
 $('allR').onclick=()=>{ A=0; B=dur; tp=null; resumeLoop(); };
-$('pp').onclick=()=>{ playing=!playing; ppText(); if(playing){ tp=null; if(pv.currentTime>=B-0.03||pv.currentTime<A) pv.currentTime=A; pv.play().catch(()=>{}); } else pv.pause(); };
+$('pp').onclick=togglePlay;
 function step(d){ playing=false; pv.pause(); ppText(); const t=Math.max(0,Math.min(dur,pv.currentTime+d/FPS)); pv.currentTime=t; tp=t; }
 $('stB').onclick=()=>step(-1); $('stF').onclick=()=>step(1);
 
@@ -893,8 +976,8 @@ const MP_VERS=["0.10.35","0.10.14"];
 const MPB="https://storage.googleapis.com/mediapipe-models/pose_landmarker/";
 const MP_MODELS={lite:MPB+"pose_landmarker_lite/float16/1/pose_landmarker_lite.task",full:MPB+"pose_landmarker_full/float16/1/pose_landmarker_full.task",heavy:MPB+"pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task"};
 const ANA={gen:0,busy:false,r:null,show:{skel:true,com:true,trail:true,base:true,ang:false},mod:null,ver:null,fileset:null,lm:{},cpu:false,lastUp:0,gOff:null,gSign:1,tsb:0};
-try{ const s=JSON.parse(localStorage.getItem('c2a2')||'null'); if(s){ if(s.show) Object.assign(ANA.show,s.show); if(s.q) $('anaQ').value=s.q; if(s.h) $('anaH').value=s.h; if(s.auto===false) $('anaAuto').checked=false; if(s.m) $('anaMulti').checked=true; } }catch(e){}
-function anaSave(){ try{ localStorage.setItem('c2a2',JSON.stringify({show:ANA.show,q:$('anaQ').value,h:+$('anaH').value||140,auto:$('anaAuto').checked,m:$('anaMulti').checked})); }catch(e){} }
+try{ const s=JSON.parse(localStorage.getItem('c2a2')||'null'); if(s){ if(s.show) Object.assign(ANA.show,s.show); if(s.q) $('anaQ').value=s.q; if(s.h) $('anaH').value=s.h; if(s.m) $('anaMulti').checked=true; } }catch(e){}
+function anaSave(){ try{ localStorage.setItem('c2a2',JSON.stringify({show:ANA.show,q:$('anaQ').value,h:+$('anaH').value||140,m:$('anaMulti').checked})); }catch(e){} }
 const sgn=()=>stage.classList.contains('mir')?-1:1;
 
 function anaLoad(kind){
@@ -916,8 +999,7 @@ async function anaLoad0(kind,key){
   try{ return await PoseLandmarker.createFromOptions(ANA.fileset,opt('GPU')); }
   catch(e){ ANA.cpu=true; delete ANA.lm[key]; return anaLoad(kind); }
 }
-/* 카메라를 켜 두는 동안 AI 모델을 미리 불러와 둬요 → 촬영 끝나면 바로 분석 */
-function anaWarm(){ if(!$('anaAuto').checked||mode==='rec'||ANA.busy) return; try{ anaLoad($('anaQ').value).catch(()=>{}); }catch(e){} }
+function anaWarm(){ /* 자동으로 미리 불러오지 않아요. '동작 정밀 분석' 버튼을 눌렀을 때만 모델을 받아요 */ }
 function anaSeek(v,t){
   return new Promise(ok=>{
     if(Math.abs(v.currentTime-t)<0.002&&v.readyState>=2){ ok(); return; }
@@ -934,7 +1016,7 @@ function anaPick(list,prev,W,H){
 }
 function anaAbort(){ ANA.gen++; ANA.busy=false; anaUI(); }
 function anaReset(){ anaAbort(); ANA.r=null; ANA.gOff=null; $('anaMsg').textContent=''; anaUI(); }
-function anaClip(){ anaReset(); if($('anaAuto').checked&&mode==='play') anaRun(); }
+function anaClip(){ anaReset(); }  /* 자동 분석 없음: 버튼을 눌러야 시작 */
 function anaUI(){
   $('anaGo').textContent=ANA.busy?'⏹ 분석 중지':(ANA.r?'🔄 다시 분석':'⚡ 동작 정밀 분석');
   $('anaRes').hidden=!ANA.r; $('aprog').hidden=!ANA.busy;
@@ -1144,7 +1226,7 @@ function anaGraphHead(i){
 window.addEventListener('resize',()=>{ if(ANA.r) anaGraph(); });
 $('anaGo').onclick=()=>{ if(ANA.busy){ anaAbort(); $('anaMsg').textContent='분석을 멈췄어요'; anaUI(); } else anaRun(); };
 document.querySelectorAll('#anaTg button').forEach(b=>{ b.onclick=()=>{ ANA.show[b.dataset.k]=!ANA.show[b.dataset.k]; anaSave(); anaUI(); }; });
-$('anaQ').onchange=()=>{ anaSave(); anaWarm(); }; $('anaMulti').onchange=()=>{ anaSave(); anaWarm(); }; $('anaH').onchange=anaSave; $('anaAuto').onchange=anaSave;
+$('anaQ').onchange=()=>{ anaSave(); anaWarm(); }; $('anaMulti').onchange=()=>{ anaSave(); anaWarm(); }; $('anaH').onchange=anaSave;
 anaUI();
 
 function setT(){ prepSec=+$('prepS').value; recSec=+$('recS').value; $('prepO').textContent=prepSec+'초'; $('recO').textContent=recSec+'초'; try{ localStorage.setItem('c2t',JSON.stringify([prepSec,recSec])); }catch(e){} }
