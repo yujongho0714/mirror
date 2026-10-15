@@ -96,6 +96,10 @@ body.chk{padding-top:calc(66px + var(--safe-t));padding-bottom:calc(92px + var(-
 #nextBar{position:fixed;left:0;right:0;bottom:0;z-index:60;background:#161c26;border-top:1px solid var(--line);padding:10px 12px calc(10px + var(--safe-b))}
 #nextBar button{width:100%;min-height:56px;font-size:18px;font-weight:900;background:var(--ok);border-color:var(--ok);color:#06210f}
 body.chk .hideChk{display:none!important}
+body.chk .stage{height:calc(100dvh - 330px - var(--safe-t) - var(--safe-b));min-height:220px}
+body.chk #spdRow{margin-top:8px}
+body.chk #spdRow button{min-height:40px;padding:8px 6px}
+body.chk #playBox{margin-top:8px;padding-top:10px}
 button.ana{width:100%;margin:0;background:#ffd23f;border-color:#ffd23f;color:#2a1300;font-weight:800;font-size:16px}
 #ov{position:fixed;inset:0;z-index:200;background:#0b0f16;display:flex;flex-direction:column;gap:8px;padding:calc(10px + var(--safe-t)) 12px calc(12px + var(--safe-b));overflow:auto}
 #ov h3{margin:0;font-size:17px}
@@ -170,10 +174,10 @@ a.go{color:var(--chung);text-decoration:underline;cursor:pointer;margin-left:6px
 </div>
 
 <div class="panel" id="playBox" hidden>
-  <h2>구간 반복 — 막대 아무 곳이나 터치(재생 중에도 OK)해서 위치를 잡고, 시작점·끝점 버튼을 눌러요</h2>
   <div id="tl"><div id="sel"></div><div id="ph"></div><div id="tp" hidden><b id="tpT"></b><i></i></div></div>
   <div class="ends"><span>0초</span><span id="endLbl"></span></div>
   <div id="info"></div>
+  <p class="note" style="margin:6px 2px 0">구간 반복 — 막대 아무 곳이나 터치(재생 중에도 OK)해서 위치를 잡고, 시작점·끝점 버튼을 눌러요</p>
   <div class="row">
     <button id="setA">⏮ 여기를 시작점</button>
     <button id="setB">여기를 끝점 ⏭</button>
@@ -214,7 +218,7 @@ a.go{color:var(--chung);text-decoration:underline;cursor:pointer;margin-left:6px
   <button id="full">⛶ 전체화면</button>
 </div>
 
-<p class="note" style="color:var(--ok);font-weight:800">버전 v21 (10/15 · 자동 분석 없음 · 영상 터치 재생/정지)</p>
+<p class="note" style="color:var(--ok);font-weight:800">버전 v22 (10/15 · 자동 분석 없음 · 영상 터치 재생/정지)</p>
 <p class="note">촬영 영상은 이 기기 안에만 잠깐 저장되고 인터넷으로 보내지 않아요. 휴대폰을 고정해 두고 촬영하세요. 카메라는 <b>https</b> 주소에서만 켜져요.</p>
 
 <div id="ov" hidden></div>
