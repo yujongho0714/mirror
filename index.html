@@ -214,6 +214,7 @@ a.go{color:var(--chung);text-decoration:underline;cursor:pointer;margin-left:6px
   <button id="full">⛶ 전체화면</button>
 </div>
 
+<p class="note" style="color:var(--ok);font-weight:800">버전 v21 (10/15 · 자동 분석 없음 · 영상 터치 재생/정지)</p>
 <p class="note">촬영 영상은 이 기기 안에만 잠깐 저장되고 인터넷으로 보내지 않아요. 휴대폰을 고정해 두고 촬영하세요. 카메라는 <b>https</b> 주소에서만 켜져요.</p>
 
 <div id="ov" hidden></div>
@@ -1233,7 +1234,13 @@ function setT(){ prepSec=+$('prepS').value; recSec=+$('recS').value; $('prepO').
 $('prepS').oninput=setT; $('recS').oninput=setT;
 try{ const v=JSON.parse(localStorage.getItem('c2t')||'null'); if(v){ $('prepS').value=v[0]; $('recS').value=v[1]; } }catch(e){}
 setT(); setMode('idle');
-if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol)){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol)){
+  /* 새 버전이 설치되면 한 번 자동으로 새로고침해서 바로 적용 (촬영·분석 중이면 끝난 뒤에) */
+  const hadSW=!!navigator.serviceWorker.controller; let swRe=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(!hadSW||swRe) return; swRe=true;
+    const go=()=>{ if(mode==='idle'&&!ANA.busy&&!CUP.busy&&!TR.pool.length) location.reload(); else setTimeout(go,3000); }; go(); });
+  navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>{ try{ r.update(); }catch(e){} }).catch(()=>{});
+}
 document.addEventListener('keydown',e=>{ if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT') return; if(e.key===' '&&mode==='play'){ e.preventDefault(); $('pp').click(); } });
 </script>
 </body>
